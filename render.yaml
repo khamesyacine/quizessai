@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: python-test-platform
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        value: changez-moi-en-production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: python-test-db
+          property: connectionString
+
+databases:
+  - name: python-test-db
+    plan: free

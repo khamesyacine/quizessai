@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐍 Python Test Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50:'#f0fdf4', 100:'#dcfce7', 200:'#bbf7d0', 500:'#22c55e', 600:'#16a34a', 700:'#15803d', 800:'#166534', 900:'#14532d' },
+                        dark: { 700:'#1e293b', 800:'#0f172a', 900:'#020617' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <style>
+        .CodeMirror { height: 320px; border-radius: 0.5rem; font-size: 14px; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+        .result-card { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+        .spinner { border:3px solid rgba(255,255,255,0.3); border-top:3px solid white; border-radius:50%; width:20px; height:20px; animation:spin 0.8s linear infinite; display:inline-block; }
+        @keyframes spin { to { transform:rotate(360deg) } }
+        .nav-link.active { background: #166534; color: white; }
+        .score-ring { transition: stroke-dashoffset 1s ease-out; }
+    </style>
+</head>
+<body class="h-full bg-gray-50">
+    <!-- Header -->
+    <header class="bg-dark-800 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">🐍</span>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Python Test Platform</h1>
+                    <p class="text-gray-400 text-sm">Évaluation automatique — USTHB</p>
+                </div>
+            </div>
+            <a href="/admin" class="text-gray-400 hover:text-white text-sm flex items-center gap-1 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                Espace Professeur
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Sidebar: Exercise Selection -->
+            <aside class="lg:col-span-3">
+                <!-- Student Info -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        Identification
+                    </h3>
+                    <input type="text" id="student-name" placeholder="Nom & Prénom"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 mb-2 outline-none">
+                    <input type="text" id="student-group" placeholder="Groupe (ex: L2-G3)"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                </div>
+
+                <!-- Exercise List -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                    <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        Exercices
+                    </h3>
+                    <nav class="space-y-1">
+                        {% for ex_id, ex in exercises.items() %}
+                        <a href="?ex={{ ex_id }}"
+                           class="nav-link block px-3 py-2 rounded-lg text-sm transition hover:bg-gray-100 {% if ex_id == current_ex %}active{% else %}text-gray-600{% endif %}">
+                            {{ ex.title }}
+                        </a>
+                        {% endfor %}
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <section class="lg:col-span-9 space-y-5">
+                <!-- Exercise Description -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="bg-brand-100 text-brand-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                            {{ exercise.title.split(':')[0] if ':' in exercise.title else 'Exercice' }}
+                        </span>
+                        <h2 class="text-lg font-bold text-gray-800">
+                            {{ exercise.title.split(':')[1] if ':' in exercise.title else exercise.title }}
+                        </h2>
+                    </div>
+                    <div class="text-gray-600 leading-relaxed prose prose-sm max-w-none">
+                        {{ exercise.description | safe }}
+                    </div>
+                    <div class="mt-3 flex items-center gap-4 text-xs text-gray-400">
+                        <span>📝 {{ exercise.test_cases | length }} tests</span>
+                        <span>⏱ Timeout: 3 secondes</span>
+                        <span>📊 Note sur 20</span>
+                    </div>
+                </div>
+
+                <!-- Code Editor -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-dark-800 text-gray-300 px-4 py-2.5 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="flex gap-1.5">
+                                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                                <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                                <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                            </div>
+                            <span class="text-sm ml-2">solution.py</span>
+                        </div>
+                        <button onclick="resetCode()" class="text-xs text-gray-400 hover:text-white transition flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Réinitialiser
+                        </button>
+                    </div>
+                    <textarea id="code-editor">{{ exercise.template }}</textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex items-center gap-3">
+                    <button onclick="submitCode()" id="submit-btn"
+                        class="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span id="submit-text">Soumettre</span>
+                    </button>
+                    <span id="submit-status" class="text-sm text-gray-400"></span>
+                </div>
+
+                <!-- Results Area -->
+                <div id="results-area" class="hidden">
+                    <!-- Score Card -->
+                    <div id="score-card" class="result-card bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-4">
+                        <div class="flex items-center gap-6">
+                            <!-- Score Ring -->
+                            <div class="relative flex-shrink-0">
+                                <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e7eb" stroke-width="8"/>
+                                    <circle id="score-ring" cx="50" cy="50" r="42" fill="none" stroke-width="8"
+                                        stroke-linecap="round" class="score-ring"
+                                        stroke-dasharray="264" stroke-dashoffset="264"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="score-value" class="text-2xl font-bold text-gray-800">0</span>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 id="score-title" class="text-lg font-bold text-gray-800">Résultat</h3>
+                                <p id="score-subtitle" class="text-sm text-gray-500 mt-1"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Test Details -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-5 py-3 bg-gray-50 border-b border-gray-200">
+                            <h3 class="font-semibold text-gray-700 text-sm">Détail des tests</h3>
+                        </div>
+                        <div id="test-details" class="divide-y divide-gray-100"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 py-6 text-center text-gray-400 text-xs border-t border-gray-200">
+        Python Test Platform — USTHB — {{ current_year if current_year else '2025' }}
+    </footer>
+
+    <script>
+        // Init CodeMirror
+        const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            mode: 'python',
+            theme: 'dracula',
+            lineNumbers: true,
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            lineWrapping: true,
+            extraKeys: {
+                "Tab": function(cm) {
+                    cm.replaceSelection("    ", "end");
+                },
+                "Ctrl-Enter": function() { submitCode(); },
+                "Cmd-Enter": function() { submitCode(); }
+            }
+        });
+
+        const CURRENT_EX = "{{ current_ex }}";
+        const TEMPLATE = {{ exercise.template | tojson }};
+
+        function resetCode() {
+            if (confirm("Réinitialiser le code ? Vos modifications seront perdues.")) {
+                editor.setValue(TEMPLATE);
+            }
+        }
+
+        async function submitCode() {
+            const name = document.getElementById('student-name').value.trim();
+            const group = document.getElementById('student-group').value.trim();
+            const code = editor.getValue();
+
+            if (!name) {
+                alert("⚠️ Veuillez entrer votre nom avant de soumettre.");
+                document.getElementById('student-name').focus();
+                return;
+            }
+            if (!code.trim() || code.trim() === TEMPLATE.trim()) {
+                alert("⚠️ Veuillez écrire votre solution avant de soumettre.");
+                return;
+            }
+
+            const btn = document.getElementById('submit-btn');
+            const btnText = document.getElementById('submit-text');
+            const status = document.getElementById('submit-status');
+
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span> Évaluation...';
+            status.textContent = "Exécution des tests en cours...";
+
+            try {
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        student_name: name,
+                        student_group: group,
+                        exercise_id: CURRENT_EX,
+                        code: code,
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.error && !result.details) {
+                    alert("❌ " + result.error);
+                    return;
+                }
+
+                displayResults(result);
+            } catch (err) {
+                alert("Erreur réseau : " + err.message);
+            } finally {
+                btn.disabled = false;
+                btnText.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Soumettre`;
+                status.textContent = "";
+            }
+        }
+
+        function displayResults(result) {
+            const area = document.getElementById('results-area');
+            area.classList.remove('hidden');
+
+            // Score
+            const score = result.score;
+            const maxScore = result.max_score || 20;
+            const pct = score / maxScore;
+
+            document.getElementById('score-value').textContent = score + "/20";
+
+            // Ring animation
+            const ring = document.getElementById('score-ring');
+            const circumference = 264;
+            const offset = circumference - (pct * circumference);
+            ring.style.stroke = pct >= 0.75 ? '#22c55e' : pct >= 0.5 ? '#eab308' : '#ef4444';
+            setTimeout(() => { ring.style.strokeDashoffset = offset; }, 50);
+
+            // Title
+            const titleEl = document.getElementById('score-title');
+            const subtitleEl = document.getElementById('score-subtitle');
+            if (pct >= 1) {
+                titleEl.textContent = "🎉 Parfait !";
+                subtitleEl.textContent = "Tous les tests sont réussis. Excellent travail !";
+            } else if (pct >= 0.75) {
+                titleEl.textContent = "👏 Très bien !";
+                subtitleEl.textContent = `${result.passed}/${result.total} tests réussis. Presque parfait !`;
+            } else if (pct >= 0.5) {
+                titleEl.textContent = "💪 Pas mal";
+                subtitleEl.textContent = `${result.passed}/${result.total} tests réussis. Continuez !`;
+            } else {
+                titleEl.textContent = "🔧 À améliorer";
+                subtitleEl.textContent = `${result.passed || 0}/${result.total} tests réussis. Réessayez !`;
+            }
+
+            // Test details
+            const container = document.getElementById('test-details');
+            container.innerHTML = '';
+
+            result.details.forEach((d, i) => {
+                const div = document.createElement('div');
+                div.className = `px-5 py-3 flex items-start gap-3 result-card ${d.passed ? 'bg-green-50/50' : 'bg-red-50/50'}`;
+                div.style.animationDelay = `${i * 0.05}s`;
+                div.innerHTML = `
+                    <span class="text-lg mt-0.5">${d.passed ? '✅' : '❌'}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-sm text-gray-800">${d.test}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full ${d.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                ${d.passed ? 'Réussi' : 'Échoué'}
+                            </span>
+                        </div>
+                        <code class="block text-xs text-gray-500 mt-1 font-mono">${escapeHtml(d.input)}</code>
+                        ${!d.passed ? `<div class="mt-1 text-xs"><span class="text-gray-500">Attendu:</span> <code class="text-green-700 font-mono">${escapeHtml(d.expected)}</code> &nbsp;|&nbsp; <span class="text-gray-500">Obtenu:</span> <code class="text-red-700 font-mono">${escapeHtml(d.got)}</code></div>` : ''}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            // Scroll to results
+            area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Keyboard shortcut hint
+        document.getElementById('submit-status').textContent = "Ctrl+Entrée pour soumettre";
+    </script>
+</body>
+</html>
