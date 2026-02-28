@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔒 Admin — Python Test Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tab-active { border-bottom: 3px solid #22c55e; color: #166534; font-weight: 600; }
+    </style>
+</head>
+<body class="h-full bg-gray-50">
+    <header class="bg-slate-900 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">🔒</span>
+                <div>
+                    <h1 class="text-xl font-bold">Espace Professeur</h1>
+                    <p class="text-gray-400 text-sm">Gestion des TPs & Résultats</p>
+                </div>
+            </div>
+            <a href="/" class="text-gray-400 hover:text-white text-sm flex items-center gap-1 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Retour
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        {% if not authenticated %}
+        <!-- Login -->
+        <div class="max-w-md mx-auto mt-20 fade-in">
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-800">Connexion Professeur</h2>
+                </div>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for cat, msg in messages %}
+                <div class="bg-{{ 'red' if cat == 'error' else 'green' }}-50 border border-{{ 'red' if cat == 'error' else 'green' }}-200 text-{{ 'red' if cat == 'error' else 'green' }}-700 px-4 py-3 rounded-lg text-sm mb-4">{{ msg }}</div>
+                {% endfor %}{% endif %}{% endwith %}
+                <form method="POST">
+                    <input type="password" name="password" placeholder="Mot de passe" autofocus required
+                        class="w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-slate-500 outline-none mb-4">
+                    <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl transition">Accéder</button>
+                </form>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="fade-in">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for cat, msg in messages %}
+            <div class="mb-4 bg-{{ 'red' if cat == 'error' else 'green' }}-50 border border-{{ 'red' if cat == 'error' else 'green' }}-200 text-{{ 'red' if cat == 'error' else 'green' }}-700 px-4 py-3 rounded-lg text-sm">{{ msg }}</div>
+            {% endfor %}{% endif %}{% endwith %}
+
+            <!-- Tabs -->
+            <div class="flex gap-6 border-b border-gray-200 mb-6">
+                <button onclick="showTab('upload')" id="tab-upload" class="pb-3 text-sm tab-active transition">📤 Upload TP</button>
+                <button onclick="showTab('notebooks')" id="tab-notebooks" class="pb-3 text-sm text-gray-500 hover:text-gray-700 transition">📓 TPs uploadés</button>
+                <button onclick="showTab('results')" id="tab-results" class="pb-3 text-sm text-gray-500 hover:text-gray-700 transition">📊 Résultats</button>
+                <button onclick="showTab('legacy')" id="tab-legacy" class="pb-3 text-sm text-gray-500 hover:text-gray-700 transition">📝 Exercices classiques</button>
+            </div>
+
+            <!-- Tab: Upload -->
+            <div id="panel-upload">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-w-2xl">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4">📤 Uploader un TP (fichier .ipynb)</h2>
+                    <form action="/admin/upload" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="password" value="{{ password }}">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Fichier Notebook (.ipynb)</label>
+                                <input type="file" name="notebook" accept=".ipynb" required
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Titre du TP (optionnel, auto-détecté)</label>
+                                <input type="text" name="title" placeholder="Ex: TP Variables et Booléens"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Description (optionnel)</label>
+                                <input type="text" name="description" placeholder="Ex: Variables, types, opérateurs booléens"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                            </div>
+                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                Uploader et créer le TP
+                            </button>
+                        </div>
+                    </form>
+                    <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800">
+                        <strong>💡 Comment ça marche :</strong>
+                        <ul class="mt-2 space-y-1 list-disc list-inside">
+                            <li>Le système détecte automatiquement les exercices (cellules contenant "Exercice")</li>
+                            <li>Les cellules Markdown deviennent du contenu de cours lisible</li>
+                            <li>Les cellules de code deviennent des exemples visuels</li>
+                            <li>Des tests automatiques sont générés pour chaque exercice</li>
+                            <li>Les étudiants accèdent au TP depuis la page d'accueil</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Notebooks -->
+            <div id="panel-notebooks" class="hidden">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">📓 TPs uploadés</h2>
+                {% if notebooks %}
+                <div class="space-y-3">
+                    {% for nb in notebooks %}
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center justify-between">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-gray-800">{{ nb.title }}</h3>
+                                <span class="text-xs px-2 py-0.5 rounded-full {{ 'bg-green-100 text-green-700' if nb.is_active else 'bg-gray-100 text-gray-500' }}">
+                                    {{ 'Actif' if nb.is_active else 'Désactivé' }}
+                                </span>
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{{ nb.nb_exercises }} exercices</span>
+                            </div>
+                            <p class="text-gray-500 text-sm mt-1">
+                                🔗 <a href="/tp/{{ nb.slug }}" class="text-blue-600 hover:underline" target="_blank">/tp/{{ nb.slug }}</a>
+                                — {{ nb.created_at.strftime('%d/%m/%Y %H:%M') if nb.created_at else '' }}
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="toggleNotebook({{ nb.id }})" class="text-sm px-3 py-1.5 rounded-lg border {{ 'border-yellow-300 text-yellow-700 hover:bg-yellow-50' if nb.is_active else 'border-green-300 text-green-700 hover:bg-green-50' }} transition">
+                                {{ 'Désactiver' if nb.is_active else 'Activer' }}
+                            </button>
+                            <button onclick="deleteNotebook({{ nb.id }}, '{{ nb.title }}')" class="text-sm px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 transition">
+                                Supprimer
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-gray-400">
+                    <p class="text-4xl mb-3">📓</p>
+                    <p>Aucun TP uploadé. Utilisez l'onglet "Upload TP" pour commencer.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab: Results (Notebook TPs) -->
+            <div id="panel-results" class="hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">📊 Résultats des TPs</h2>
+                    <a href="/admin/export?pwd={{ password }}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Exporter CSV
+                    </a>
+                </div>
+                {% if full_submissions %}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Étudiant</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Groupe</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">TP</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Note</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                {% for s in full_submissions %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-gray-400 text-xs">{{ s.id }}</td>
+                                    <td class="px-4 py-3 font-medium text-gray-800">{{ s.student_name }}</td>
+                                    <td class="px-4 py-3 text-gray-500">{{ s.student_group or '—' }}</td>
+                                    <td class="px-4 py-3">
+                                        <span class="bg-purple-50 text-purple-700 text-xs font-medium px-2 py-0.5 rounded">{{ s.notebook_slug }}</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {% set pct = s.total_score / s.max_score %}
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                                                <div class="h-2 rounded-full {% if pct >= 0.75 %}bg-green-500{% elif pct >= 0.5 %}bg-yellow-500{% else %}bg-red-500{% endif %}"
+                                                    style="width: {{ (pct * 100) | int }}%"></div>
+                                            </div>
+                                            <span class="font-semibold {% if pct >= 0.75 %}text-green-700{% elif pct >= 0.5 %}text-yellow-700{% else %}text-red-700{% endif %}">
+                                                {{ s.total_score }}/{{ s.max_score | int }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-500 text-xs">{{ s.submitted_at.strftime('%d/%m/%Y %H:%M') if s.submitted_at else '—' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-gray-400">
+                    <p>Aucune soumission de TP pour le moment.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab: Legacy Results -->
+            <div id="panel-legacy" class="hidden">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">📝 Résultats — Exercices classiques</h2>
+                {% if submissions %}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Étudiant</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Groupe</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Exercice</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Note</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                {% for s in submissions %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-gray-400 text-xs">{{ s.id }}</td>
+                                    <td class="px-4 py-3 font-medium text-gray-800">{{ s.student_name }}</td>
+                                    <td class="px-4 py-3 text-gray-500">{{ s.student_group or '—' }}</td>
+                                    <td class="px-4 py-3">
+                                        {% set ex = exercises.get(s.exercise_id, {}) %}
+                                        <span class="bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded">
+                                            {{ ex.get('title', s.exercise_id) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {% set pct = s.score / s.max_score %}
+                                        <span class="font-semibold {% if pct >= 0.75 %}text-green-700{% elif pct >= 0.5 %}text-yellow-700{% else %}text-red-700{% endif %}">
+                                            {{ s.score }}/{{ s.max_score | int }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-500 text-xs">{{ s.submitted_at.strftime('%d/%m/%Y %H:%M') if s.submitted_at else '—' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-12 text-gray-400"><p>Aucune soumission.</p></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <script>
+            const PASSWORD = "{{ password }}";
+
+            function showTab(name) {
+                ['upload','notebooks','results','legacy'].forEach(t => {
+                    document.getElementById('panel-' + t).classList.toggle('hidden', t !== name);
+                    const tab = document.getElementById('tab-' + t);
+                    if (t === name) { tab.classList.add('tab-active'); tab.classList.remove('text-gray-500'); }
+                    else { tab.classList.remove('tab-active'); tab.classList.add('text-gray-500'); }
+                });
+            }
+
+            async function toggleNotebook(id) {
+                const form = new FormData();
+                form.append('password', PASSWORD);
+                const resp = await fetch('/admin/notebook/' + id + '/toggle', { method: 'POST', body: form });
+                if (resp.ok) location.reload();
+            }
+
+            async function deleteNotebook(id, title) {
+                if (!confirm('Supprimer le TP "' + title + '" ? Cette action est irréversible.')) return;
+                const form = new FormData();
+                form.append('password', PASSWORD);
+                const resp = await fetch('/admin/notebook/' + id + '/delete', { method: 'POST', body: form });
+                if (resp.ok) location.reload();
+            }
+        </script>
+        {% endif %}
+    </main>
+</body>
+</html>
