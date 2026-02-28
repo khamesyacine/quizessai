@@ -68,7 +68,7 @@
                     </div>
 
                 {% elif cell.type == "code" %}
-                    <!-- Code Cell — Editable Exercise -->
+                    <!-- Code Cell — Editable + Executable -->
                     <div class="{% if cell.is_student_cell %}exercise-block bg-green-50 border-green-200{% else %}bg-white border-gray-200{% endif %} rounded-xl shadow-sm border p-4" id="exercise-{{ cell.exercise_id }}">
                         {% if cell.is_student_cell %}
                         <div class="flex items-center gap-2 mb-2">
@@ -83,12 +83,25 @@
                         </div>
                         {% endif %}
                         <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-slate-800 text-gray-300 px-3 py-1.5 flex items-center gap-2 text-xs">
-                                <div class="flex gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span><span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span></div>
-                                <span>{{ 'Cellule ' ~ cell.exercise_id.replace('code_', '') }}</span>
+                            <div class="bg-slate-800 text-gray-300 px-3 py-1.5 flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span><span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span></div>
+                                    <span>Cellule {{ cell.exercise_id.replace('code_', '') }}</span>
+                                </div>
+                                <button onclick="runCell('{{ cell.exercise_id }}')" class="run-btn bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1" id="run-{{ cell.exercise_id }}">
+                                    ▶ Exécuter
+                                </button>
                             </div>
                             <textarea class="exercise-editor" data-exercise-id="{{ cell.exercise_id }}">{{ cell.source }}</textarea>
                         </div>
+                        <!-- Output area -->
+                        <div class="mt-2 hidden" id="output-{{ cell.exercise_id }}">
+                            <div class="bg-slate-900 rounded-lg p-3 font-mono text-sm overflow-x-auto">
+                                <div class="text-gray-400 text-xs mb-1">Sortie :</div>
+                                <pre class="text-green-400 whitespace-pre-wrap" id="output-text-{{ cell.exercise_id }}"></pre>
+                            </div>
+                        </div>
+                        <!-- Grading result (shown on submit all) -->
                         <div class="exercise-result hidden mt-2" id="result-{{ cell.exercise_id }}"></div>
                     </div>
                 {% endif %}
@@ -136,10 +149,52 @@
                 indentUnit: 4, tabSize: 4, indentWithTabs: false,
                 autoCloseBrackets: true, matchBrackets: true, lineWrapping: true,
                 viewportMargin: Infinity,
-                extraKeys: { "Tab": cm => cm.replaceSelection("    ", "end") }
+                extraKeys: {
+                    "Tab": cm => cm.replaceSelection("    ", "end"),
+                    "Shift-Enter": () => runCell(exId),
+                }
             });
             editors[exId] = cm;
         });
+
+        async function runCell(exId) {
+            const cm = editors[exId];
+            if (!cm) return;
+
+            const code = cm.getValue().trim();
+            if (!code) { alert("⚠️ La cellule est vide."); return; }
+
+            const btn = document.getElementById('run-' + exId);
+            const origText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;"></span> ...';
+            btn.disabled = true;
+
+            try {
+                const resp = await fetch('/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code }),
+                });
+                const result = await resp.json();
+
+                const outputDiv = document.getElementById('output-' + exId);
+                const outputText = document.getElementById('output-text-' + exId);
+                outputDiv.classList.remove('hidden');
+
+                if (result.success) {
+                    outputText.textContent = result.output || '(pas de sortie)';
+                    outputText.className = 'text-green-400 whitespace-pre-wrap';
+                } else {
+                    outputText.textContent = result.error || result.output || 'Erreur inconnue';
+                    outputText.className = 'text-red-400 whitespace-pre-wrap';
+                }
+            } catch (e) {
+                alert("Erreur réseau : " + e.message);
+            } finally {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+            }
+        }
 
         async function submitAll() {
             const name = document.getElementById('student-name').value.trim();

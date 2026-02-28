@@ -240,13 +240,40 @@ def markdown_to_html(md_text):
     return '\n'.join(result_lines)
 
 
+def execute_code_for_output(code):
+    """Execute a code cell and return its stdout output."""
+    if not code.strip():
+        return ""
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
+            f.write(code)
+            tmp_path = f.name
+        result = subprocess.run(
+            ["python3", tmp_path],
+            capture_output=True, text=True, timeout=5,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+        os.unlink(tmp_path)
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        return ""
+
+
 def parse_notebook(nb_json):
-    """Parse a Jupyter notebook and extract cells + exercises."""
+    """Parse a Jupyter notebook. ALL code cells become evaluable exercises."""
     cells_data = []
     exercises = []
-    exercise_idx = 0
+    code_cell_idx = 0
 
     nb_cells = nb_json.get("cells", [])
+
+    # Get the markdown context before each code cell for descriptions
+    last_markdown_html = ""
+    last_markdown_raw = ""
 
     for i, cell in enumerate(nb_cells):
         cell_type = cell.get("cell_type", "")
@@ -254,105 +281,90 @@ def parse_notebook(nb_json):
 
         if cell_type == "markdown":
             html_content = markdown_to_html(source)
-            is_exercise = bool(re.search(r'exercice\s*\d+', source, re.IGNORECASE))
+            last_markdown_html = html_content
+            last_markdown_raw = source
 
-            cell_data = {
+            cells_data.append({
                 "type": "markdown",
                 "html": html_content,
-                "is_exercise": is_exercise,
+                "is_exercise": False,
                 "raw": source,
-            }
-
-            if is_exercise:
-                # Extract exercise number and description
-                match = re.search(r'exercice\s*(\d+)', source, re.IGNORECASE)
-                ex_num = match.group(1) if match else str(exercise_idx + 1)
-
-                # Get the next code cell as template
-                template = "# Votre code ici\n"
-                if i + 1 < len(nb_cells) and nb_cells[i + 1]["cell_type"] == "code":
-                    template = "".join(nb_cells[i + 1]["source"])
-
-                exercise = {
-                    "id": f"nb_ex{ex_num}",
-                    "number": int(ex_num),
-                    "title": f"Exercice {ex_num}",
-                    "description_md": source,
-                    "description_html": html_content,
-                    "template": template,
-                    "test_cases": [],  # Will be set by professor
-                }
-                exercises.append(exercise)
-                cell_data["exercise_id"] = exercise["id"]
-                exercise_idx += 1
-
-            cells_data.append(cell_data)
+            })
 
         elif cell_type == "code":
-            # Skip cells that are exercise templates (already captured)
-            prev_is_exercise = (i > 0 and cells_data and cells_data[-1].get("is_exercise"))
+            code = source.strip()
+            code_cell_idx += 1
+
+            # Determine if this is an empty/template cell (student exercise)
+            is_student_cell = (
+                not code
+                or code.startswith("# Votre code")
+                or code.startswith("# Vérifiez")
+                or (code.count("\n") == 0 and code.startswith("#"))
+            )
+
+            # Check if there are existing outputs in the notebook
+            expected_output = ""
+            for o in cell.get("outputs", []):
+                if "text" in o:
+                    expected_output = "".join(o["text"]).strip()
+                elif "data" in o and "text/plain" in o["data"]:
+                    expected_output = "".join(o["data"]["text/plain"]).strip()
+
+            # If no saved output, execute to get expected output
+            if not expected_output and code and not is_student_cell:
+                expected_output = execute_code_for_output(code)
+
+            # Create exercise ID
+            ex_id = f"code_{code_cell_idx}"
+
+            # Build test case: the test is simply running the code and checking stdout
+            test_cases = []
+            if expected_output and not is_student_cell:
+                # The test: run student code, expect the same output
+                test_cases.append({
+                    "input": "",  # No extra input needed — the code itself is the test
+                    "expected": expected_output,
+                })
+
+            # Determine a short title from context
+            title = f"Cellule {code_cell_idx}"
+            if is_student_cell:
+                # Check if previous markdown has exercise info
+                match = re.search(r'exercice\s*(\d+)', last_markdown_raw, re.IGNORECASE)
+                if match:
+                    title = f"Exercice {match.group(1)}"
+                else:
+                    title = f"Exercice (cellule {code_cell_idx})"
+
+            exercise = {
+                "id": ex_id,
+                "number": code_cell_idx,
+                "title": title,
+                "description_html": last_markdown_html if is_student_cell else "",
+                "template": code if not is_student_cell else code,
+                "expected_output": expected_output,
+                "test_cases": test_cases,
+                "is_student_cell": is_student_cell,
+                "is_example": not is_student_cell and bool(expected_output),
+            }
+            exercises.append(exercise)
+
             cells_data.append({
                 "type": "code",
-                "source": source,
-                "is_template": prev_is_exercise,
-                "exercise_id": cells_data[-1].get("exercise_id", "") if prev_is_exercise else "",
+                "source": code,
+                "exercise_id": ex_id,
+                "is_student_cell": is_student_cell,
+                "is_example": not is_student_cell,
+                "expected_output": expected_output,
             })
 
     return cells_data, exercises
 
 
 def generate_test_cases_for_exercise(exercise):
-    """Generate automatic test cases based on exercise description."""
-    desc = exercise["description_md"].lower()
-    ex_num = exercise["number"]
-    tests = []
-
-    if ex_num == 1:
-        tests = [
-            {"input": "nb_leucocytes = 8200\nprint(type(nb_leucocytes).__name__)", "expected": "int"},
-            {"input": "glycemie = 0.95\nprint(type(glycemie).__name__)", "expected": "float"},
-            {"input": 'diagnostic = "Diabète type 2"\nprint(type(diagnostic).__name__)', "expected": "str"},
-            {"input": "hospitalise = False\nprint(type(hospitalise).__name__)", "expected": "bool"},
-        ]
-    elif ex_num == 2:
-        tests = [
-            {"input": "poids = 92\ntaille = 1.68\nIMC = poids / (taille ** 2)\nprint(f'IMC du patient : {round(IMC, 1)} kg/m²')", "expected": "IMC du patient : 32.6 kg/m²"},
-        ]
-    elif ex_num == 3:
-        tests = [
-            {"input": 'hemoglobine = "13.2"\nprint(type(float(hemoglobine)).__name__)', "expected": "float"},
-            {"input": 'globules_rouges = "4800000"\nprint(type(int(globules_rouges)).__name__)', "expected": "int"},
-            {"input": 'groupe_sanguin = "A+"\nprint(type(groupe_sanguin).__name__)', "expected": "str"},
-        ]
-    elif ex_num == 4:
-        tests = [
-            {"input": "N0 = 1\nn = 10\nN = N0 * (2 ** n)\nprint(N)", "expected": "1024"},
-        ]
-    elif ex_num == 5:
-        tests = [
-            {"input": "r1, r2, r3 = 650, 820, 530\ntotal = r1 + r2 + r3\nprint(total)", "expected": "2000"},
-            {"input": "r1, r2, r3 = 650, 820, 530\nmoyenne = (r1 + r2 + r3) / 3\nprint(round(moyenne, 1))", "expected": "666.7"},
-        ]
-    elif ex_num == 6:
-        tests = [
-            {"input": "print(10 > 5)", "expected": "True"},
-            {"input": 'print("ADN" != "ARN")', "expected": "True"},
-            {"input": "print(True and False)", "expected": "False"},
-            {"input": "print(False or True)", "expected": "True"},
-            {"input": "print(not (5 > 3))", "expected": "False"},
-        ]
-    elif ex_num == 7:
-        tests = [
-            {"input": "IgG = 12.5\nIgM = 0.8\nIgG_normal = IgG >= 7 and IgG <= 16\nIgM_normal = IgM >= 0.4 and IgM <= 2.3\nprint(IgG_normal and IgM_normal)", "expected": "True"},
-        ]
-    elif ex_num == 8:
-        tests = [
-            {"input": "glyc = 1.35\nprint(glyc > 1.1)", "expected": "True"},
-            {"input": "IMC = 31.2\nprint(IMC >= 30)", "expected": "True"},
-            {"input": "glyc = 1.35\nfumeur = True\nIMC = 31.2\nprint(glyc > 1.1 and fumeur and IMC >= 30)", "expected": "True"},
-        ]
-
-    return tests
+    """Auto-generate test cases — tests are already created during parsing."""
+    return exercise.get("test_cases", [])
 
 
 # ──────────────────────────────────────────────
@@ -432,27 +444,45 @@ def grade_submission_legacy(student_code, exercise_id):
     return {"score": score, "max_score": 20, "passed": passed, "total": total, "details": details, "error": ""}
 
 
-def grade_notebook_exercise(student_code, test_cases):
-    """Grade a notebook exercise."""
+def grade_notebook_exercise(student_code, test_cases, is_example=False):
+    """Grade a notebook exercise.
+    For example cells: the student code is executed directly and output is compared.
+    For student cells: test cases are run after the student code.
+    """
     is_safe, msg = check_code_safety(student_code)
     if not is_safe:
-        return {"score": 0, "details": [{"test": "Sécurité", "passed": False, "message": msg}], "error": msg}
+        return {"score": 0, "passed": 0, "total": 1, "details": [{"test": "Sécurité", "passed": False, "message": msg}], "error": msg}
 
     if not test_cases:
-        return {"score": 0, "details": [{"test": "Config", "passed": False, "message": "Aucun test configuré"}], "error": "Pas de tests"}
+        # No test cases — just check the code runs without error
+        result = run_student_code(student_code, "")
+        if result["success"]:
+            return {"passed": 1, "total": 1, "details": [{"test": "Exécution", "passed": True, "input": "", "expected": "(code exécuté)", "got": result["output"], "message": "✅ Code exécuté sans erreur"}]}
+        else:
+            return {"passed": 0, "total": 1, "details": [{"test": "Exécution", "passed": False, "input": "", "expected": "(sans erreur)", "got": result["error"], "message": f"❌ Erreur — {result['error'][:200]}"}]}
 
     total = len(test_cases)
     passed = 0
     details = []
 
     for i, tc in enumerate(test_cases, 1):
-        result = run_student_code(student_code, tc["input"])
-        if result["success"] and result["output"].strip() == tc["expected"].strip():
-            passed += 1
-            details.append({"test": f"Test {i}", "passed": True, "input": tc["input"], "expected": tc["expected"], "got": result["output"], "message": "✅ Réussi"})
+        test_input = tc.get("input", "")
+
+        if is_example and not test_input:
+            # For example cells: the student code IS the program, run it directly
+            result = run_student_code(student_code, "")
         else:
-            msg = result["error"] if result["error"] else f"Attendu: {tc['expected']} | Obtenu: {result['output']}"
-            details.append({"test": f"Test {i}", "passed": False, "input": tc["input"], "expected": tc["expected"], "got": result["output"] or "(erreur)", "message": f"❌ — {msg}"})
+            result = run_student_code(student_code, test_input)
+
+        expected = tc["expected"].strip()
+        got = result["output"].strip()
+
+        if result["success"] and got == expected:
+            passed += 1
+            details.append({"test": f"Test {i}", "passed": True, "input": test_input or "(exécution directe)", "expected": expected, "got": got, "message": "✅ Réussi"})
+        else:
+            err_msg = result["error"] if result["error"] else f"Attendu: {expected} | Obtenu: {got}"
+            details.append({"test": f"Test {i}", "passed": False, "input": test_input or "(exécution directe)", "expected": expected, "got": got or "(erreur)", "message": f"❌ — {err_msg[:200]}"})
 
     return {"passed": passed, "total": total, "details": details}
 
@@ -479,6 +509,29 @@ def view_notebook(slug):
     cells = notebook.get_cells()
     exercises = notebook.get_exercises()
     return render_template("notebook.html", notebook=notebook, cells=cells, exercises=exercises)
+
+
+@app.route("/run", methods=["POST"])
+def run_code():
+    """Execute a single code cell and return the output (no grading)."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Données invalides."}), 400
+
+    code = data.get("code", "").strip()
+    if not code:
+        return jsonify({"output": "", "error": "Code vide."})
+
+    is_safe, msg = check_code_safety(code)
+    if not is_safe:
+        return jsonify({"output": "", "error": msg})
+
+    result = run_student_code(code, "", timeout=3)
+    return jsonify({
+        "output": result["output"],
+        "error": result["error"],
+        "success": result["success"],
+    })
 
 
 @app.route("/submit", methods=["POST"])
@@ -557,8 +610,9 @@ def submit_notebook():
             total_possible += len(test_cases) if test_cases else 1
             continue
 
-        if test_cases:
-            result = grade_notebook_exercise(code, test_cases)
+        if test_cases or not ex.get("is_student_cell", False):
+            is_example = ex.get("is_example", False)
+            result = grade_notebook_exercise(code, test_cases, is_example=is_example)
             total_points += result["passed"]
             total_possible += result["total"]
             all_details.append({
