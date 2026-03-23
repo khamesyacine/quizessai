@@ -6,16 +6,14 @@
     <title>📓 {{ notebook.title }} — Python Test Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
     <style>
-        .CodeMirror { height: auto; min-height: 120px; max-height: 400px; border-radius: 0.5rem; font-size: 13px; }
-        .spinner { border:3px solid rgba(255,255,255,0.3); border-top:3px solid white; border-radius:50%; width:20px; height:20px; animation:spin 0.8s linear infinite; display:inline-block; }
+        .CodeMirror { height: auto; min-height: 100px; max-height: 400px; border-radius: 0 0 0.5rem 0.5rem; font-size: 13px; border: none; }
+        .spinner { border:3px solid rgba(255,255,255,0.3); border-top:3px solid white; border-radius:50%; width:16px; height:16px; animation:spin 0.8s linear infinite; display:inline-block; }
         @keyframes spin { to { transform:rotate(360deg) } }
-        .cell-code pre { background: #282a36; color: #f8f8f2; padding: 12px 16px; border-radius: 8px; font-size: 13px; overflow-x: auto; font-family: 'Consolas', monospace; }
         .cell-markdown h2 { font-size: 1.4rem; font-weight: 700; color: #1e293b; margin: 1.2rem 0 0.6rem; }
         .cell-markdown h3 { font-size: 1.15rem; font-weight: 600; color: #334155; margin: 1rem 0 0.5rem; }
         .cell-markdown h4 { font-size: 1rem; font-weight: 600; color: #475569; margin: 0.8rem 0 0.4rem; }
@@ -24,32 +22,22 @@
         .exercise-block { border-left: 4px solid #22c55e; }
         .result-anim { animation: fadeSlide 0.3s ease-out; }
         @keyframes fadeSlide { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
-        .score-ring { transition: stroke-dashoffset 1s ease-out; }
     </style>
 </head>
 <body class="h-full bg-gray-50">
-    <!-- Header -->
     <header class="bg-slate-900 text-white shadow-xl sticky top-0 z-50">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <a href="/" class="text-gray-400 hover:text-white transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                </a>
-                <div>
-                    <h1 class="text-lg font-bold">📓 {{ notebook.title }}</h1>
-                    <p class="text-gray-400 text-xs">{{ notebook.nb_exercises }} exercices — Note sur 20</p>
-                </div>
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+            <a href="/" class="text-gray-400 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            </a>
+            <div>
+                <h1 class="text-lg font-bold">📓 {{ notebook.title }}</h1>
+                <p class="text-gray-400 text-xs">{{ notebook.nb_exercises }} exercices — Note sur 20</p>
             </div>
-            <button onclick="submitAll()" id="submit-all-btn"
-                class="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                <span id="submit-all-text">Soumettre tout</span>
-            </button>
         </div>
     </header>
 
     <main class="max-w-4xl mx-auto px-4 py-6">
-        <!-- Student Info Bar -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap gap-3 items-center">
             <span class="text-gray-600 text-sm font-medium">👤 Identification :</span>
             <input type="text" id="student-name" placeholder="Nom & Prénom" required
@@ -58,94 +46,68 @@
                 class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
         </div>
 
-        <!-- Notebook Cells -->
         <div class="space-y-4" id="notebook-content">
             {% for cell in cells %}
                 {% if cell.type == "markdown" %}
-                    <!-- Markdown Content -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                         <div class="cell-markdown text-gray-700 leading-relaxed">{{ cell.html | safe }}</div>
                     </div>
 
                 {% elif cell.type == "code" %}
-                    <!-- Code Cell — Editable + Executable -->
                     <div class="{% if cell.is_student_cell %}exercise-block bg-green-50 border-green-200{% else %}bg-white border-gray-200{% endif %} rounded-xl shadow-sm border p-4" id="exercise-{{ cell.exercise_id }}">
+                        
                         {% if cell.is_student_cell %}
                         <div class="flex items-center gap-2 mb-2">
                             <span class="bg-green-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">✏️ À compléter</span>
                         </div>
                         {% else %}
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">💻 Code à reproduire</span>
+                            <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">💻 Cellule {{ cell.exercise_id.replace('code_', '') }}</span>
                             {% if cell.expected_output %}
-                            <span class="text-xs text-gray-400">Sortie attendue : <code class="bg-gray-100 px-1.5 py-0.5 rounded text-green-700">{{ cell.expected_output[:80] }}</code></span>
+                            <span class="text-xs text-gray-400">Sortie attendue : <code class="bg-gray-100 px-1.5 py-0.5 rounded text-green-700 text-xs">{{ cell.expected_output[:80] }}</code></span>
                             {% endif %}
                         </div>
                         {% endif %}
-                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <div class="bg-slate-800 text-gray-300 px-3 py-1.5 flex items-center justify-between text-xs">
-                                <div class="flex items-center gap-2">
-                                    <div class="flex gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span><span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span></div>
-                                    <span>Cellule {{ cell.exercise_id.replace('code_', '') }}</span>
+
+                        <div class="rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gray-50 text-gray-600 px-3 py-1.5 flex items-center justify-between text-xs border-b border-gray-200">
+                                <span class="font-medium">In [{{ cell.exercise_id.replace('code_', '') }}]</span>
+                                <div class="flex gap-2">
+                                    <button onclick="runCell('{{ cell.exercise_id }}')" id="run-{{ cell.exercise_id }}"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1">
+                                        ▶ Exécuter
+                                    </button>
+                                    <button onclick="submitCell('{{ cell.exercise_id }}')" id="submit-{{ cell.exercise_id }}"
+                                        class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1">
+                                        📝 Soumettre
+                                    </button>
                                 </div>
-                                <button onclick="runCell('{{ cell.exercise_id }}')" class="run-btn bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1" id="run-{{ cell.exercise_id }}">
-                                    ▶ Exécuter
-                                </button>
                             </div>
                             <textarea class="exercise-editor" data-exercise-id="{{ cell.exercise_id }}">{{ cell.source }}</textarea>
                         </div>
-                        <!-- Output area -->
+
                         <div class="mt-2 hidden" id="output-{{ cell.exercise_id }}">
-                            <div class="bg-slate-900 rounded-lg p-3 font-mono text-sm overflow-x-auto">
-                                <div class="text-gray-400 text-xs mb-1">Sortie :</div>
-                                <pre class="text-green-400 whitespace-pre-wrap" id="output-text-{{ cell.exercise_id }}"></pre>
+                            <div class="bg-white rounded-lg border border-gray-200 p-3 font-mono text-sm overflow-x-auto">
+                                <div class="text-gray-400 text-xs mb-1">Out [{{ cell.exercise_id.replace('code_', '') }}] :</div>
+                                <pre class="text-gray-800 whitespace-pre-wrap" id="output-text-{{ cell.exercise_id }}"></pre>
                             </div>
                         </div>
-                        <!-- Grading result (shown on submit all) -->
+
                         <div class="exercise-result hidden mt-2" id="result-{{ cell.exercise_id }}"></div>
                     </div>
                 {% endif %}
             {% endfor %}
         </div>
-
-        <!-- Submit All Button (bottom) -->
-        <div class="mt-8 mb-4 flex justify-center">
-            <button onclick="submitAll()" class="bg-green-600 hover:bg-green-700 text-white font-bold px-10 py-4 rounded-xl shadow-lg text-lg transition flex items-center gap-3">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Soumettre toutes mes réponses
-            </button>
-        </div>
-
-        <!-- Global Results -->
-        <div id="global-results" class="hidden mt-6 mb-10">
-            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                <div class="flex items-center gap-6 mb-6">
-                    <div class="relative flex-shrink-0">
-                        <svg class="w-28 h-28 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e7eb" stroke-width="8"/>
-                            <circle id="global-ring" cx="50" cy="50" r="42" fill="none" stroke-width="8" stroke-linecap="round" class="score-ring" stroke-dasharray="264" stroke-dashoffset="264"/>
-                        </svg>
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <span id="global-score" class="text-3xl font-bold text-gray-800">0</span>
-                        </div>
-                    </div>
-                    <div>
-                        <h2 id="global-title" class="text-xl font-bold text-gray-800">Résultat final</h2>
-                        <p id="global-subtitle" class="text-gray-500 mt-1"></p>
-                    </div>
-                </div>
-                <div id="global-details" class="space-y-3"></div>
-            </div>
-        </div>
     </main>
 
     <script>
-        // Initialize all CodeMirror editors
+        const NOTEBOOK_SLUG = "{{ notebook.slug }}";
+
         const editors = {};
         document.querySelectorAll('.exercise-editor').forEach(textarea => {
             const exId = textarea.dataset.exerciseId;
             const cm = CodeMirror.fromTextArea(textarea, {
-                mode: 'python', theme: 'dracula', lineNumbers: true,
+                mode: 'python', lineNumbers: true,
                 indentUnit: 4, tabSize: 4, indentWithTabs: false,
                 autoCloseBrackets: true, matchBrackets: true, lineWrapping: true,
                 viewportMargin: Infinity,
@@ -160,13 +122,12 @@
         async function runCell(exId) {
             const cm = editors[exId];
             if (!cm) return;
-
             const code = cm.getValue().trim();
-            if (!code) { alert("⚠️ La cellule est vide."); return; }
+            if (!code) return;
 
             const btn = document.getElementById('run-' + exId);
-            const origText = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;"></span> ...';
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner"></span>';
             btn.disabled = true;
 
             try {
@@ -176,117 +137,87 @@
                     body: JSON.stringify({ code }),
                 });
                 const result = await resp.json();
-
                 const outputDiv = document.getElementById('output-' + exId);
                 const outputText = document.getElementById('output-text-' + exId);
                 outputDiv.classList.remove('hidden');
 
                 if (result.success) {
                     outputText.textContent = result.output || '(pas de sortie)';
-                    outputText.className = 'text-green-400 whitespace-pre-wrap';
+                    outputText.className = 'text-gray-800 whitespace-pre-wrap';
                 } else {
-                    outputText.textContent = result.error || result.output || 'Erreur inconnue';
-                    outputText.className = 'text-red-400 whitespace-pre-wrap';
+                    outputText.textContent = result.error || 'Erreur';
+                    outputText.className = 'text-red-600 whitespace-pre-wrap';
                 }
-            } catch (e) {
-                alert("Erreur réseau : " + e.message);
-            } finally {
-                btn.innerHTML = origText;
-                btn.disabled = false;
-            }
+            } catch (e) { alert("Erreur: " + e.message); }
+            finally { btn.innerHTML = orig; btn.disabled = false; }
         }
 
-        async function submitAll() {
+        async function submitCell(exId) {
             const name = document.getElementById('student-name').value.trim();
             const group = document.getElementById('student-group').value.trim();
             if (!name) { alert("⚠️ Veuillez entrer votre nom."); document.getElementById('student-name').focus(); return; }
 
-            // Collect all answers
-            const answers = {};
-            for (const [exId, cm] of Object.entries(editors)) {
-                answers[exId] = cm.getValue();
-            }
+            const cm = editors[exId];
+            if (!cm) return;
+            const code = cm.getValue().trim();
+            if (!code) { alert("⚠️ La cellule est vide."); return; }
 
-            const btn = document.getElementById('submit-all-btn');
-            const btnText = document.getElementById('submit-all-text');
+            const btn = document.getElementById('submit-' + exId);
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner"></span> ...';
             btn.disabled = true;
-            btnText.innerHTML = '<span class="spinner"></span> Évaluation...';
 
             try {
+                const answers = {};
+                answers[exId] = code;
+
                 const resp = await fetch('/submit_notebook', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         student_name: name,
                         student_group: group,
-                        notebook_slug: "{{ notebook.slug }}",
+                        notebook_slug: NOTEBOOK_SLUG,
                         answers: answers,
                     }),
                 });
                 const result = await resp.json();
                 if (result.error) { alert("❌ " + result.error); return; }
-                displayGlobalResults(result);
-            } catch(e) { alert("Erreur: " + e.message); }
-            finally {
-                btn.disabled = false;
-                btnText.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Soumettre tout';
-            }
+
+                const exResult = (result.exercises || []).find(e => e.exercise_id === exId);
+                if (exResult) {
+                    showExerciseResult(exId, exResult, result.score);
+                }
+            } catch (e) { alert("Erreur: " + e.message); }
+            finally { btn.innerHTML = orig; btn.disabled = false; }
         }
 
-        function displayGlobalResults(result) {
-            // Show per-exercise results
-            (result.exercises || []).forEach(ex => {
-                const container = document.getElementById('result-' + ex.exercise_id);
-                if (!container) return;
-                container.classList.remove('hidden');
-                const allPassed = ex.total > 0 && ex.passed === ex.total;
-                container.innerHTML = `
-                    <div class="result-anim rounded-lg p-3 ${allPassed ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'}">
-                        <div class="flex items-center justify-between">
-                            <span class="font-semibold text-sm ${allPassed ? 'text-green-800' : 'text-red-800'}">
-                                ${allPassed ? '✅' : '❌'} ${ex.title} — ${ex.passed}/${ex.total} tests réussis
-                            </span>
-                        </div>
-                        <div class="mt-2 space-y-1">
-                            ${(ex.details||[]).map(d => `
-                                <div class="text-xs flex items-start gap-1.5">
-                                    <span>${d.passed ? '✅' : '❌'}</span>
-                                    <span class="text-gray-700">${escapeHtml(d.message || d.test)}</span>
-                                </div>
-                            `).join('')}
-                        </div>
+        function showExerciseResult(exId, exResult, score) {
+            const container = document.getElementById('result-' + exId);
+            if (!container) return;
+            container.classList.remove('hidden');
+
+            const allPassed = exResult.total > 0 && exResult.passed === exResult.total;
+            container.innerHTML = `
+                <div class="result-anim rounded-lg p-3 ${allPassed ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'}">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-sm ${allPassed ? 'text-green-800' : 'text-red-800'}">
+                            ${allPassed ? '✅' : '❌'} ${exResult.passed}/${exResult.total} tests réussis — Note: ${score}/20
+                        </span>
                     </div>
-                `;
-            });
-
-            // Show global score
-            const area = document.getElementById('global-results');
-            area.classList.remove('hidden');
-
-            const score = result.score;
-            const pct = score / 20;
-            document.getElementById('global-score').textContent = score + "/20";
-
-            const ring = document.getElementById('global-ring');
-            ring.style.stroke = pct >= 0.75 ? '#22c55e' : pct >= 0.5 ? '#eab308' : '#ef4444';
-            setTimeout(() => { ring.style.strokeDashoffset = 264 - (pct * 264); }, 100);
-
-            document.getElementById('global-title').textContent =
-                pct >= 1 ? "🎉 Parfait !" : pct >= 0.75 ? "👏 Très bien !" : pct >= 0.5 ? "💪 Pas mal" : "🔧 À améliorer";
-            document.getElementById('global-subtitle').textContent =
-                `${result.total_points} tests réussis sur ${result.total_possible}`;
-
-            // Exercise summary
-            const details = document.getElementById('global-details');
-            details.innerHTML = (result.exercises || []).map(ex => {
-                const p = ex.total > 0 ? (ex.passed / ex.total) : 0;
-                return `<div class="flex items-center justify-between p-3 rounded-lg ${p >= 1 ? 'bg-green-50' : p > 0 ? 'bg-yellow-50' : 'bg-red-50'} result-anim">
-                    <span class="text-sm font-medium text-gray-800">${p >= 1 ? '✅' : p > 0 ? '⚠️' : '❌'} ${ex.title}</span>
-                    <span class="text-sm font-bold ${p >= 1 ? 'text-green-700' : p > 0 ? 'text-yellow-700' : 'text-red-700'}">${ex.passed}/${ex.total}</span>
-                </div>`;
-            }).join('');
-
-            area.scrollIntoView({ behavior: 'smooth' });
+                    <div class="mt-2 space-y-1">
+                        ${(exResult.details || []).map(d => `
+                            <div class="text-xs flex items-start gap-1.5">
+                                <span>${d.passed ? '✅' : '❌'}</span>
+                                <div>
+                                    <span class="text-gray-700">${escapeHtml(d.message || d.test)}</span>
+                                    ${!d.passed && d.expected ? `<div class="mt-0.5 text-gray-500">Attendu: <code class="text-green-700">${escapeHtml(d.expected)}</code> | Obtenu: <code class="text-red-700">${escapeHtml(d.got || '')}</code></div>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
         }
 
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }

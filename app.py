@@ -311,19 +311,19 @@ def parse_notebook(nb_json):
                 elif "data" in o and "text/plain" in o["data"]:
                     expected_output = "".join(o["data"]["text/plain"]).strip()
 
-            # If no saved output, execute to get expected output
+            # If no saved output AND it's a real code cell (not empty), execute to get output
             if not expected_output and code and not is_student_cell:
                 expected_output = execute_code_for_output(code)
 
             # Create exercise ID
             ex_id = f"code_{code_cell_idx}"
 
-            # Build test case: the test is simply running the code and checking stdout
+            # Build test case: compare student output with expected
             test_cases = []
-            if expected_output and not is_student_cell:
-                # The test: run student code, expect the same output
+            if expected_output:
+                # BOTH student cells and example cells get tests if there's an expected output
                 test_cases.append({
-                    "input": "",  # No extra input needed — the code itself is the test
+                    "input": "",
                     "expected": expected_output,
                 })
 
