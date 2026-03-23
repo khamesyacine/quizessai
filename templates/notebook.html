@@ -39,12 +39,53 @@
     </header>
 
     <main class="max-w-4xl mx-auto px-4 py-6">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap gap-3 items-center">
-            <span class="text-gray-600 text-sm font-medium">👤 Identification :</span>
-            <input type="text" id="student-name" placeholder="Nom & Prénom" required
-                class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
-            <input type="text" id="student-group" placeholder="Groupe"
-                class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+            <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">👤 Identification</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Nom *</label>
+                    <input type="text" id="student-lastname" placeholder="Nom" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Prénom *</label>
+                    <input type="text" id="student-firstname" placeholder="Prénom" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Spécialité *</label>
+                    <select id="student-specialty" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white">
+                        <option value="">-- Choisir --</option>
+                        <option value="BIOTECHNOLOGY AND MOLECULAR PATHOLOGY">Biotechnology and Molecular Pathology</option>
+                        <option value="PHARMACOLOGICAL SCIENCES">Pharmacological Sciences</option>
+                        <option value="MICROBIOLOGY AND QUALITY">Microbiology and Quality</option>
+                        <option value="BIOCHEMISTRY">Biochemistry</option>
+                        <option value="IMMUNOLOGY">Immunology</option>
+                        <option value="GENETICS">Genetics</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Niveau *</label>
+                    <select id="student-level" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white">
+                        <option value="">-- Choisir --</option>
+                        <option value="L3">Licence L3</option>
+                        <option value="M1">Master M1</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timer -->
+        <div class="bg-slate-900 text-white rounded-xl p-4 mb-6 flex items-center justify-between sticky top-14 z-40 shadow-lg" id="timer-bar">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">⏱</span>
+                <span class="text-sm font-medium">Temps restant :</span>
+            </div>
+            <div class="text-2xl font-bold font-mono" id="timer-display">30:00</div>
         </div>
 
         <!-- Rules reminder -->
@@ -115,8 +156,88 @@
     <script>
         const NOTEBOOK_SLUG = "{{ notebook.slug }}";
 
-        // Track attempts per exercise: { exerciseId: { attempts: 0, maxAttempts: 2, locked: false, passed: false } }
-        const attemptTracker = {};
+        // ══════════════════════════════════
+        // TIMER — 30 minutes
+        // ══════════════════════════════════
+        let timeLeft = 30 * 60; // 30 minutes in seconds
+        let timerStarted = false;
+        let timerInterval = null;
+
+        function startTimer() {
+            if (timerStarted) return;
+            timerStarted = true;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const mins = Math.floor(timeLeft / 60);
+                const secs = timeLeft % 60;
+                const display = document.getElementById('timer-display');
+                const bar = document.getElementById('timer-bar');
+                display.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+                // Color changes
+                if (timeLeft <= 60) {
+                    bar.className = bar.className.replace('bg-slate-900', '').replace('bg-orange-600', '').replace('bg-red-700', '') + ' bg-red-700';
+                    display.classList.add('animate-pulse');
+                } else if (timeLeft <= 300) {
+                    bar.className = bar.className.replace('bg-slate-900', '').replace('bg-orange-600', '') + ' bg-orange-600';
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    display.textContent = "00:00";
+                    lockAllCells();
+                    alert("⏱ Temps écoulé ! Toutes les questions sont verrouillées.");
+                }
+            }, 1000);
+        }
+
+        function lockAllCells() {
+            for (const exId of Object.keys(editors)) {
+                const tracker = attemptTracker[exId];
+                if (!tracker.locked) {
+                    tracker.locked = true;
+                    lockCell(exId, tracker.passed);
+                    updateAttemptsBadge(exId);
+                    if (!tracker.passed) {
+                        const badge = document.getElementById('attempts-' + exId);
+                        if (badge) badge.innerHTML = '<span class="text-red-600 font-semibold">⏱ Temps écoulé</span>';
+                    }
+                }
+            }
+        }
+
+        // ══════════════════════════════════
+        // STUDENT INFO HELPERS
+        // ══════════════════════════════════
+        function getStudentName() {
+            const nom = document.getElementById('student-lastname').value.trim();
+            const prenom = document.getElementById('student-firstname').value.trim();
+            return `${nom} ${prenom}`.trim();
+        }
+
+        function getStudentGroup() {
+            const specialty = document.getElementById('student-specialty').value;
+            const level = document.getElementById('student-level').value;
+            if (specialty && level) return `${level} — ${specialty}`;
+            return specialty || level || '';
+        }
+
+        function validateStudentInfo() {
+            const nom = document.getElementById('student-lastname').value.trim();
+            const prenom = document.getElementById('student-firstname').value.trim();
+            const specialty = document.getElementById('student-specialty').value;
+            const level = document.getElementById('student-level').value;
+
+            if (!nom) { alert("⚠️ Veuillez entrer votre nom."); document.getElementById('student-lastname').focus(); return false; }
+            if (!prenom) { alert("⚠️ Veuillez entrer votre prénom."); document.getElementById('student-firstname').focus(); return false; }
+            if (!specialty) { alert("⚠️ Veuillez choisir votre spécialité."); document.getElementById('student-specialty').focus(); return false; }
+            if (!level) { alert("⚠️ Veuillez choisir votre niveau."); document.getElementById('student-level').focus(); return false; }
+            return true;
+        }
+
+        // ══════════════════════════════════
+        // ATTEMPTS TRACKER
+        // ══════════════════════════════════
 
         const editors = {};
         document.querySelectorAll('.exercise-editor').forEach(textarea => {
@@ -137,8 +258,12 @@
 
         // ▶ Exécuter — unlimited, just shows output
         async function runCell(exId) {
+            if (!validateStudentInfo()) return;
+            startTimer(); // Start timer on first action
+
             const tracker = attemptTracker[exId];
             if (tracker && tracker.locked) { alert("🔒 Cette question est verrouillée."); return; }
+            if (timeLeft <= 0) { alert("⏱ Temps écoulé !"); return; }
 
             const cm = editors[exId];
             if (!cm) return;
@@ -174,15 +299,18 @@
 
         // 📝 Soumettre — 2 attempts max
         async function submitCell(exId) {
+            if (!validateStudentInfo()) return;
+            startTimer(); // Start timer on first action
+            if (timeLeft <= 0) { alert("⏱ Temps écoulé !"); return; }
+
             const tracker = attemptTracker[exId];
             
             // Check if already passed or locked
             if (tracker.passed) { alert("✅ Vous avez déjà réussi cette question !"); return; }
             if (tracker.locked) { alert("🔒 Vous avez épuisé vos 2 tentatives pour cette question."); return; }
 
-            const name = document.getElementById('student-name').value.trim();
-            const group = document.getElementById('student-group').value.trim();
-            if (!name) { alert("⚠️ Veuillez entrer votre nom."); document.getElementById('student-name').focus(); return; }
+            const name = getStudentName();
+            const group = getStudentGroup();
 
             const cm = editors[exId];
             if (!cm) return;
