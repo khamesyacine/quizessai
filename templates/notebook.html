@@ -291,8 +291,7 @@
                             <div class="text-xs flex items-start gap-1.5">
                                 <span>${d.passed ? '✅' : '❌'}</span>
                                 <div>
-                                    <span class="text-gray-700">${escapeHtml(d.message || d.test)}</span>
-                                    ${!d.passed && d.expected ? `<div class="mt-0.5 text-gray-500">Attendu: <code class="text-green-700">${escapeHtml(d.expected)}</code> | Obtenu: <code class="text-red-700">${escapeHtml(d.got || '')}</code></div>` : ''}
+                                    <span class="text-gray-700">${d.passed ? 'Bonne réponse !' : 'Mauvaise réponse'}</span>
                                 </div>
                             </div>
                         `).join('')}
